@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cart | AgroLink</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style4.css" />
+  <style>
+    .cart-item {
+      border-bottom: 1px solid #ddd;
+      padding: 1rem 0;
+    }
+    .cart-item img {
+      height: 100px;
+      width: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .cart-summary {
+      background-color: #f8f9fa;
+      padding: 1.5rem;
+      border-radius: 10px;
+      margin-top: 2rem;
+    }
+    .btn-sm {
+      font-size: 0.8rem;
+      padding: 0.4rem 0.6rem;
+    }
+    #cart-count {
+      font-size: 0.7rem;
+      padding: 5px 7px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+  <!-- Navbar -->
+<!-- Bootstrap Navbar with Beautiful Profile Dropdown -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm fixed-top">
+  <div class="container">
+    <a class="navbar-brand fw-bold text-success" href="index.html">AgroLink</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+      data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false"
+      aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+      <ul class="navbar-nav align-items-center">
+        <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="crops.html">Browse Crops</a></li>
+        <li class="nav-item"><a class="nav-link" href="sell.html">Sell Crops</a></li>
+        <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
+        <li class="nav-item"><a class="btn btn-success ms-3" href="register.html">Join</a></li>
+
+        <!-- Cart -->
+        <li class="nav-item ms-3">
+          <a class="nav-link position-relative" href="cart.html">
+            🛒 Cart
+            <span id="cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
+          </a>
+        </li>
+
+        <!-- 🌟 Beautiful Profile Dropdown -->
+    
+<!-- Profile Dropdown (with human-style avatar) -->
+<!-- Profile Dropdown (Myntra-style with avatar) -->
+<li class="nav-item dropdown ms-3">
+  <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="profileDropdown"
+     role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    <img src="https://i.ibb.co/ZYW3VTp/boy-avatar.png"
+         alt="Profile Picture" width="36" height="36" class="rounded-circle border border-2 shadow-sm" />
+    <span class="fw-semibold text-dark">Profile</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end shadow profile-dropdown" aria-labelledby="profileDropdown">
+    <li class="px-3 py-3 border-bottom">
+      <p class="mb-0 fw-bold">Hello, Arpita 👋</p>
+      <p class="mb-0 text-muted small">View & edit profile</p>
+    </li>
+    <li><a class="dropdown-item py-2" href="order-status.html">🧾 My Orders</a></li>
+    <li><a class="dropdown-item py-2" href="#">❤️ Wishlist</a></li>
+    <li><a class="dropdown-item py-2" href="#">🎁 Gift Cards</a></li>
+    <li><a class="dropdown-item py-2" href="contact.html">📞 Contact Us</a></li>
+    <li><a class="dropdown-item py-2" href="#">🌟 Subscription</a></li>
+    
+    <li><a class="dropdown-item py-2" href="#">🏷️ Coupons</a></li>
+    <li><a class="dropdown-item py-2" href="#">💼 Saved Cards</a></li>
+    <li><a class="dropdown-item py-2" href="#">🏦 Saved VPA</a></li>
+    <li><a class="dropdown-item py-2" href="#">🏠 Saved Addresses</a></li>
+  </ul>
+</li>
+
+
+
+        <!-- End Profile Dropdown -->
+      </ul>
+    </div>
+  </div>
+</nav>
+<!-- Main Cart Section -->
+<div class="container mt-5 pt-5">
+  <h2 class="mb-4">Your Cart</h2>
+
+  <!-- Items will be inserted here dynamically -->
+  <div id="cartItemsContainer"></div>
+
+  <!-- Cart summary -->
+  <div class="cart-summary">
+    <h5>Total: ₹<span id="cartTotal">0</span></h5>
+    <button class="btn btn-success mt-3" id="checkoutBtn">Proceed to Checkout</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  const cartContainer = document.getElementById("cartItemsContainer");
+  const cartTotalEl = document.getElementById("cartTotal");
+  const checkoutBtn = document.getElementById("checkoutBtn");
+  let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+  function renderCart() {
+    cartContainer.innerHTML = "";
+    let total = 0;
+
+    if (cart.length === 0) {
+      cartContainer.innerHTML = `<p class="text-muted">Your cart is empty.</p>`;
+      cartTotalEl.textContent = "0";
+      return;
+    }
+
+    cart.forEach(item => {
+      const itemTotal = item.price * item.quantity;
+      total += itemTotal;
+
+      const itemEl = document.createElement("div");
+      itemEl.classList.add("row", "align-items-center", "cart-item");
+
+      itemEl.innerHTML = `
+        <div class="col-md-2">
+          <img src="http://localhost:5000${item.image}" alt="${item.name}" class="img-fluid" />
+        </div>
+        <div class="col-md-3">
+          <h5>${item.name}</h5>
+          <p class="text-muted">₹${item.price} x ${item.quantity}</p>
+        </div>
+        <div class="col-md-3">
+          <div class="d-flex align-items-center">
+            <button class="btn btn-outline-danger btn-sm me-2 decrease-btn">−</button>
+            <span class="fw-bold">${item.quantity}</span>
+            <button class="btn btn-outline-success btn-sm ms-2 increase-btn">+</button>
+          </div>
+        </div>
+        <div class="col-md-2 fw-semibold">
+          ₹${itemTotal}
+        </div>
+        <div class="col-md-2 text-end">
+          <button class="btn btn-sm btn-outline-dark remove-btn">Remove</button>
+        </div>
+      `;
+
+      // Increase/Decrease/Remove logic
+      itemEl.querySelector(".increase-btn").addEventListener("click", () => {
+        item.quantity++;
+        saveCartAndRender();
+      });
+
+      itemEl.querySelector(".decrease-btn").addEventListener("click", () => {
+        if (item.quantity > 1) {
+          item.quantity--;
+          saveCartAndRender();
+        }
+      });
+
+      itemEl.querySelector(".remove-btn").addEventListener("click", () => {
+        cart = cart.filter(c => c.id !== item.id);
+        saveCartAndRender();
+      });
+
+      cartContainer.appendChild(itemEl);
+    });
+
+    cartTotalEl.textContent = total.toFixed(2);
+  }
+
+  function saveCartAndRender() {
+    localStorage.setItem("cart", JSON.stringify(cart));
+    renderCart();
+    updateCartCount();
+  }
+
+  function updateCartCount() {
+    const count = cart.reduce((total, item) => total + item.quantity, 0);
+    const badge = document.getElementById("cart-count");
+    if (badge) badge.textContent = count;
+  }
+
+ checkoutBtn.addEventListener("click", () => {
+  if (cart.length === 0) {
+    alert("Your cart is empty!");
+    return;
+  }
+  window.location.href = "checkout.html";
+});
+
+
+  // Initial render
+  renderCart();
+</script>
+</body>
+</html>

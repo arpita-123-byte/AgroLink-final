@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crop Details | AgroLink</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style4.css">
+  <style>
+    .crop-image {
+      max-height: 400px;
+      object-fit: cover;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    .custom-btn {
+      background-color: #ff3f6c;
+      color: white;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: background-color 0.2s;
+    }
+    .custom-btn:hover {
+      background-color: #e6335c;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+<!-- Bootstrap Navbar with Beautiful Profile Dropdown -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm fixed-top">
+  <div class="container">
+    <a class="navbar-brand fw-bold text-success" href="index.html">AgroLink</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+      data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false"
+      aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+      <ul class="navbar-nav align-items-center">
+        <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="crops.html">Browse Crops</a></li>
+        <li class="nav-item"><a class="nav-link" href="sell.html">Sell Crops</a></li>
+        <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
+        <li class="nav-item"><a class="btn btn-success ms-3" href="register.html">Join</a></li>
+
+        <!-- Cart -->
+        <li class="nav-item ms-3">
+          <a class="nav-link position-relative" href="cart.html">
+            🛒 Cart
+            <span id="cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
+          </a>
+        </li>
+
+        <!-- 🌟 Beautiful Profile Dropdown -->
+    
+<!-- Profile Dropdown (with human-style avatar) -->
+<!-- Profile Dropdown (Myntra-style with avatar) -->
+<li class="nav-item dropdown ms-3">
+  <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="profileDropdown"
+     role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    <img src="https://i.ibb.co/ZYW3VTp/boy-avatar.png"
+         alt="Profile Picture" width="36" height="36" class="rounded-circle border border-2 shadow-sm" />
+    <span class="fw-semibold text-dark">Profile</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end shadow profile-dropdown" aria-labelledby="profileDropdown">
+    <li class="px-3 py-3 border-bottom">
+      <p class="mb-0 fw-bold">Hello, Arpita 👋</p>
+      <p class="mb-0 text-muted small">View & edit profile</p>
+    </li>
+    <li><a class="dropdown-item py-2" href="order-status.html">🧾 My Orders</a></li>
+    <li><a class="dropdown-item py-2" href="#">❤️ Wishlist</a></li>
+    <li><a class="dropdown-item py-2" href="#">🎁 Gift Cards</a></li>
+    <li><a class="dropdown-item py-2" href="contact.html">📞 Contact Us</a></li>
+    <li><a class="dropdown-item py-2" href="#">🌟 Subscription</a></li>
+    
+    <li><a class="dropdown-item py-2" href="#">🏷️ Coupons</a></li>
+    <li><a class="dropdown-item py-2" href="#">💼 Saved Cards</a></li>
+    <li><a class="dropdown-item py-2" href="#">🏦 Saved VPA</a></li>
+    <li><a class="dropdown-item py-2" href="#">🏠 Saved Addresses</a></li>
+  </ul>
+</li>
+
+
+
+        <!-- End Profile Dropdown -->
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Section -->
+<div class="container mt-5 pt-5">
+  <div id="cropDetail" class="row align-items-center"></div>
+</div>
+
+<script>
+  let cartItems = [];
+
+const singleItem = localStorage.getItem("checkoutItem");
+if (singleItem) {
+  cartItems = [JSON.parse(singleItem)];
+  localStorage.removeItem("checkoutItem"); // Optional: clean up after use
+} else {
+  const savedCart = localStorage.getItem("cart");
+  cartItems = savedCart ? JSON.parse(savedCart) : [];
+}
+
+  function updateCartCount() {
+   const count = cartItems.reduce((total, item) => total + item.quantity, 0);
+    const badge = document.getElementById("cart-count");
+    if (badge) badge.textContent = count;
+  }
+
+  async function loadCropDetail() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const cropId = urlParams.get('id');
+    if (!cropId) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/crops/${cropId}`);
+      const crop = await res.json();
+      const cart = JSON.parse(localStorage.getItem("cart")) || [];
+      const inCart = cart.find(item => item.id === crop._id);
+
+      const detailContainer = document.getElementById('cropDetail');
+      detailContainer.innerHTML = `
+        <div class="col-md-6">
+          <img src="http://localhost:5000${crop.image}" alt="${crop.name}" class="img-fluid crop-image">
+        </div>
+        <div class="col-md-6">
+          <h2 class="text-success">${crop.name}</h2>
+          <p class="text-muted">Category: ${crop.category}</p>
+          <p>${crop.description}</p>
+          <p><strong>Quantity:</strong> ${crop.quantity}</p>
+          <p><strong>Location:</strong> ${crop.location}</p>
+          <p><strong>Price:</strong> ₹${crop.price}</p>
+          <div class="d-flex gap-3 mt-4">
+            <button class="btn btn-primary btn-lg" id="buyNowBtn">Buy Now</button>
+            <button class="custom-btn" id="cartActionBtn">
+              ${inCart ? "Go to Cart →" : "🛍️ Add to Cart"}
+            </button>
+          </div>
+        </div>
+      `;
+
+      const cartBtn = document.getElementById("cartActionBtn");
+      cartBtn.addEventListener("click", () => {
+        if (inCart) {
+          window.location.href = "cart.html";
+        } else {
+          // Add to cart
+          const newCart = [...cart, { id: crop._id, name: crop.name, price: crop.price, image: crop.image, quantity: 1 }];
+          localStorage.setItem("cart", JSON.stringify(newCart));
+          updateCartCount();
+          cartBtn.innerHTML = "Go to Cart →";
+          cartBtn.onclick = () => window.location.href = "cart.html";
+        }
+      });
+
+      // 👇 Add this block below the cartBtn logic
+const buyNowBtn = document.getElementById("buyNowBtn");
+buyNowBtn.addEventListener("click", () => {
+  const cropItem = {
+    id: crop._id,
+    name: crop.name,
+    price: crop.price,
+    image: crop.image,
+    quantity: 1
+  };
+  localStorage.setItem("checkoutItem", JSON.stringify(cropItem));
+  window.location.href = "checkout.html";
+});
+    } catch (error) {
+      console.error('Error loading crop detail:', error);
+      document.getElementById('cropDetail').innerHTML = `<p class="text-danger">Could not load crop details.</p>`;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    loadCropDetail();
+    updateCartCount();
+  });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+
