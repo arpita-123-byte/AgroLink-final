@@ -23,8 +23,9 @@ const Contact= require("./models/Contact");
 
 const app = express();
 // app.use(express.static(__dirname));
-const PORT = 5000;
+// const PORT = 5000;
 
+const PORT = process.env.PORT || 5000;
 
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
@@ -351,7 +352,7 @@ app.get("/api/stats", async (req, res) => {
     // Start server
    http.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
-  open(`start http://localhost:${PORT}`);
+  // open(`start http://localhost:${PORT}`);
 });
 
 
