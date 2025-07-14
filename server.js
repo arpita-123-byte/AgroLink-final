@@ -120,7 +120,8 @@ mongoose
         {
           clientID: process.env.FACEBOOK_APP_ID,
           clientSecret: process.env.FACEBOOK_APP_SECRET,
-          callbackURL: "/auth/facebook/callback",
+          callbackURL: process.env.FACEBOOK_CALLBACK_URL,
+
           profileFields: ["id", "displayName", "emails"],
         },
         async (accessToken, refreshToken, profile, done) => {
