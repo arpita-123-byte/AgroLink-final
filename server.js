@@ -59,7 +59,7 @@ app.use("/assets", express.static(path.join(__dirname, "assets")));
 // HTML Routes
     const pages = [
       "login", "signup", "index", "sell", "crops", "crop-detail",
-      "register", "cart", "checkout", "order-confirmation", "update-status", "order-status", "contact"
+      "register", "cart", "checkout", "order-confirmation", "update-status", "order-status", "contact", "choose-role"
     ];
     pages.forEach((page) => {
       app.get(`/${page}.html`, (req, res) => res.sendFile(path.join(__dirname, `${page}.html`)));
@@ -90,72 +90,112 @@ mongoose
       done(null, user);
     });
 
-    // Google OAuth Strategy
-    passport.use(
-      new GoogleStrategy(
-        {
-          clientID: process.env.GOOGLE_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          callbackURL: process.env.GOOGLE_CALLBACK_URL,
+    // Google Strategy
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      const email = profile.emails[0].value;
+      let user = await User.findOne({ email });
 
-        },
-        async (accessToken, refreshToken, profile, done) => {
-          const existingUser = await User.findOne({ email: profile.emails[0].value });
-          if (existingUser) return done(null, existingUser);
+      if (user) {
+  if (!user.role) {
+    user.role = global.oauthRole || "buyer";
+    await user.save();
+  }
+  return done(null, user);
+}
 
-          const newUser = new User({
-            name: profile.displayName,
-            email: profile.emails[0].value,
-            password: "google_oauth",
-          });
-          await newUser.save();
-          done(null, newUser);
-        }
-      )
-    );
+      const role = global.oauthRole || "buyer"; // fallback
+      user = new User({
+        name: profile.displayName,
+        email,
+        password: "google_oauth",
+        role
+      });
 
-    // Facebook Strategy
-    passport.use(
-      new FacebookStrategy(
-        {
-          clientID: process.env.FACEBOOK_APP_ID,
-          clientSecret: process.env.FACEBOOK_APP_SECRET,
-          callbackURL: process.env.FACEBOOK_CALLBACK_URL,
+      await user.save();
+      done(null, user);
+    }
+  )
+);
 
-          profileFields: ["id", "displayName", "emails"],
-        },
-        async (accessToken, refreshToken, profile, done) => {
-          const email = profile.emails?.[0]?.value;
-          if (!email) return done(null, false);
+// Facebook Strategy
+passport.use(
+  new FacebookStrategy(
+    {
+      clientID: process.env.FACEBOOK_APP_ID,
+      clientSecret: process.env.FACEBOOK_APP_SECRET,
+      callbackURL: process.env.FACEBOOK_CALLBACK_URL,
+      profileFields: ["id", "displayName", "emails"],
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      const email = profile.emails?.[0]?.value;
+      if (!email) return done(null, false);
 
-          let user = await User.findOne({ email });
-          if (user) return done(null, user);
+      let user = await User.findOne({ email });
+      if (user) {
+  if (!user.role) {
+    user.role = global.oauthRole || "buyer";
+    await user.save();
+  }
+  return done(null, user);
+}
 
-          user = new User({
-            name: profile.displayName,
-            email,
-            password: "facebook_oauth",
-          });
-          await user.save();
-          done(null, user);
-        }
-      )
-    );
 
-    // Auth Routes
-    app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-    app.get(
-      "/auth/google/callback",
-      passport.authenticate("google", { failureRedirect: "/login.html" }),
-      (req, res) => res.redirect("/index.html")
-    );
+      const role = global.oauthRole || "buyer";
+      user = new User({
+        name: profile.displayName,
+        email,
+        password: "facebook_oauth",
+        role
+      });
 
-    app.get("/auth/facebook", passport.authenticate("facebook", { scope: ["email"] }));
-    app.get(
-      "/auth/facebook/callback",
-      passport.authenticate("facebook", { failureRedirect: "/login.html" }),
-      (req, res) => res.redirect("/index.html")
-    );
+      await user.save();
+      done(null, user);
+    }
+  )
+);
+
+// Google OAuth Callback
+app.get("/auth/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login.html" }),
+  (req, res) => {
+    const role = req.user.role;
+    if (role === "farmer") return res.redirect("/sell.html");
+    return res.redirect("/index.html"); // buyer or admin
+  }
+);
+
+// Facebook OAuth Callback
+app.get("/auth/facebook/callback",
+  passport.authenticate("facebook", { failureRedirect: "/login.html" }),
+  (req, res) => {
+    const role = req.user.role;
+    if (role === "farmer") return res.redirect("/sell.html");
+    return res.redirect("/index.html"); // buyer or admin
+  }
+);
+
+
+
+// Capture role from query param for Google login
+app.get("/auth/google", (req, res, next) => {
+  global.oauthRole = req.query.role || "buyer";
+  next();
+}, passport.authenticate("google", { scope: ["profile", "email"] }));
+
+// Capture role from query param for Facebook login
+app.get("/auth/facebook", (req, res, next) => {
+  global.oauthRole = req.query.role || "buyer";
+  next();
+}, passport.authenticate("facebook", { scope: ["email"] }));
+
+
     
 
     const Contact = require('./models/Contact');` ` 
@@ -296,43 +336,49 @@ app.get("/api/stats", async (req, res) => {
 
 
 
+app.post("/signup", async (req, res) => {
+  try {
+    const { name, email, password, confirmPassword, role } = req.body;
+    if (password !== confirmPassword) return res.status(400).json({ success: false, message: "Passwords do not match" });
 
-    // Signup
-    app.post("/signup", async (req, res) => {
-      try {
-        const { name, email, password, confirmPassword } = req.body;
-        if (password !== confirmPassword) return res.status(400).send("Passwords do not match");
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ success: false, message: "User already exists" });
 
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).send("User already exists");
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ name, email, password: hashedPassword, role });
+    await user.save();
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ name, email, password: hashedPassword });
-        await user.save();
+    req.session.userId = user._id;
 
-        req.session.userId = user._id;
-        res.status(200).json({ success: true });
-      } catch (err) {
-        res.status(500).send("Error signing up");
-      }
-    });
+    res.status(200).json({ success: true, role: user.role });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Error signing up" });
+  }
+});
+
 
     // Login
-    app.post("/login", async (req, res) => {
-      try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).send("Invalid email or password");
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ success: false, message: "Invalid email or password" });
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).send("Invalid email or password");
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ success: false, message: "Invalid email or password" });
 
-        req.session.userId = user._id;
-        res.status(200).json({ success: true });
-      } catch (err) {
-        res.status(500).send("Error logging in");
-      }
-    });
+    req.session.userId = user._id;
+
+    // ✅ Send role back to frontend for redirection
+    res.status(200).json({ success: true, role: user.role });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ success: false, message: "Error logging in" });
+  }
+});
+
+
 
     // Test route
     app.get("/test-users", async (req, res) => {
@@ -478,6 +524,25 @@ io.on('connection', (socket) => {
 });
 
 
+app.get("/choose-role", (req, res) => {
+  if (!req.session.userId) return res.redirect("/login.html");
+  res.sendFile(path.join(__dirname, "choose-role.html"));
+});
+
+app.post("/set-role", async (req, res) => {
+  try {
+    if (!req.session.userId) return res.status(401).send("Unauthorized");
+
+    const { role } = req.body;
+    if (!["farmer", "buyer"].includes(role)) return res.status(400).send("Invalid role");
+
+    await User.findByIdAndUpdate(req.session.userId, { role });
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Role set error:", err);
+    res.status(500).send("Error setting role");
+  }
+});
 
 
 

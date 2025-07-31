@@ -183,3 +183,27 @@ form a:hover {
   color: #007bff;
   font-weight: 500;
 }
+
+select {
+  width: 100%;
+  padding: 12px 16px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  font-size: 16px;
+  color: #333;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='gray' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+select:focus {
+  border-color: #66cc66;
+  box-shadow: 0 0 5px rgba(102, 204, 102, 0.5);
+  outline: none;
+}

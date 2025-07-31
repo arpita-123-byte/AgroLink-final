@@ -42,20 +42,28 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const password = document.querySelector("input[name='password']").value;
 
   const response = await fetch("http://localhost:5000/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({ email, password }),
-  });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/x-www-form-urlencoded"
+  },
+  body: new URLSearchParams({ email, password }),
+});
 
-  if (response.ok) {
-    localStorage.setItem("userEmail", email);  // ✅ Set localStorage
-    window.location.href = "index.html";
+if (response.ok) {
+  const data = await response.json();
+  localStorage.setItem("userEmail", email);
+  
+  // ✅ Redirect based on role
+  if (data.role === "farmer") {
+    window.location.href = "sell.html";
   } else {
-    const errorText = await response.text();
-    alert("Login failed: " + errorText);
+    window.location.href = "index.html";  // for buyer and admin
   }
+} else {
+  const errorText = await response.text();
+  alert("Login failed: " + errorText);
+}
+
 });
 </script>
 

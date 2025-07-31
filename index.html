@@ -32,7 +32,7 @@
       <ul class="navbar-nav align-items-center">
         <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
         <li class="nav-item"><a class="nav-link" href="crops.html">Browse Crops</a></li>
-        <li class="nav-item"><a class="nav-link" href="sell.html">Sell Crops</a></li>
+        <!-- <li class="nav-item"><a class="nav-link" href="sell.html">Sell Crops</a></li> -->
         <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
         <li class="nav-item"><a class="btn btn-success ms-3" href="register.html">Join</a></li>
 
@@ -77,6 +77,17 @@
 
         <!-- End Profile Dropdown -->
       </ul>
+<button class="logout-btn" onclick="logout()">Logout</button>
+
+<script>
+  function logout() {
+    fetch('/logout')
+      .then(() => window.location.href = '/login.html')
+      .catch(err => alert("Logout failed"));
+  }
+</script>
+
+
     </div>
   </div>
 </nav>
