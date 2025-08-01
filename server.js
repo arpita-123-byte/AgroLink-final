@@ -370,7 +370,7 @@ app.post("/login", async (req, res) => {
 
     req.session.userId = user._id;
 
-    // ✅ Send role back to frontend for redirection
+    //  Send role back to frontend for redirection
     res.status(200).json({ success: true, role: user.role });
   } catch (err) {
     console.error("Login error:", err);
@@ -396,6 +396,10 @@ app.post("/login", async (req, res) => {
         res.redirect("/login.html");
       });
     });
+    app.get("/api/razorpay-key", (req, res) => {
+  res.json({ key: process.env.RAZORPAY_KEY_ID });
+});
+
 
     // Start server
    http.listen(PORT, () => {
@@ -698,6 +702,32 @@ app.post("/api/checkout", async (req, res) => {
     res.status(500).json({ success: false, message: "Something went wrong." });
   }
 });
+
+const Razorpay = require("razorpay");
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+app.post("/api/create-order", async (req, res) => {
+  const { amount } = req.body;
+
+  const options = {
+    amount: amount * 100, // amount in paise
+    currency: "INR",
+    receipt: "order_rcptid_" + Date.now()
+  };
+
+  try {
+    const order = await razorpay.orders.create(options);
+    res.json(order);
+  } catch (err) {
+    console.error("Razorpay order error:", err);
+    res.status(500).json({ error: "Failed to create order" });
+  }
+});
+
 
 
 app.get("/api/orders", async (req, res) => {

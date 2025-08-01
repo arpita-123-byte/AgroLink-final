@@ -220,5 +220,39 @@
       }
     });
   </script>
+  <!-- <script src="https://checkout.razorpay.com/v1/checkout.js"></script> -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  async function startRazorpayPayment(totalAmount, buyerEmail) {
+    const res = await fetch("/api/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: totalAmount })
+    });
+
+    const order = await res.json();
+
+    const options = {
+      key: "RAZORPAY_KEY_ID_HERE", // From .env (visible part only)
+      amount: order.amount,
+      currency: "INR",
+      name: "AgroLink",
+      description: "Crop Purchase",
+      order_id: order.id,
+      handler: function (response) {
+        alert("Payment successful! ID: " + response.razorpay_payment_id);
+        // You can also redirect to a success page or save this to DB
+      },
+      prefill: {
+        email: buyerEmail,
+      },
+      theme: { color: "#28a745" }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+  }
+</script>
+
 </body>
 </html>
