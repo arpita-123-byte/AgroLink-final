@@ -396,9 +396,7 @@ app.post("/login", async (req, res) => {
         res.redirect("/login.html");
       });
     });
-    app.get("/api/razorpay-key", (req, res) => {
-  res.json({ key: process.env.RAZORPAY_KEY_ID });
-});
+ 
 
 
     // Start server
@@ -703,6 +701,10 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 
+   app.get("/api/razorpay-key", (req, res) => {
+  res.json({ key: process.env.RAZORPAY_KEY_ID });
+});
+
 const Razorpay = require("razorpay");
 
 const razorpay = new Razorpay({
@@ -716,14 +718,15 @@ app.post("/api/create-order", async (req, res) => {
   const options = {
     amount: amount * 100, // amount in paise
     currency: "INR",
-    receipt: "order_rcptid_" + Date.now()
+    receipt: "order_rcptid_" + Date.now(),
   };
 
   try {
     const order = await razorpay.orders.create(options);
+    console.log("✅ Razorpay Order Created:", order); // Add this for debugging
     res.json(order);
   } catch (err) {
-    console.error("Razorpay order error:", err);
+    console.error("❌ Razorpay order error:", err); // Helpful debug log
     res.status(500).json({ error: "Failed to create order" });
   }
 });
