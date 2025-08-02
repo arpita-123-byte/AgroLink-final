@@ -101,158 +101,161 @@
   </div>
 
   <!-- Checkout Script -->
-  <script>
-    let cartItems = [];
-    const singleItem = localStorage.getItem("checkoutItem");
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  let cartItems = [];
+  const singleItem = localStorage.getItem("checkoutItem");
 
-    if (singleItem) {
-      cartItems = [JSON.parse(singleItem)];
-      localStorage.removeItem("checkoutItem");
-    } else {
-      const savedCart = localStorage.getItem("cart");
-      cartItems = savedCart ? JSON.parse(savedCart) : [];
-    }
+  if (singleItem) {
+    cartItems = [JSON.parse(singleItem)];
+    localStorage.removeItem("checkoutItem");
+  } else {
+    const savedCart = localStorage.getItem("cart");
+    cartItems = savedCart ? JSON.parse(savedCart) : [];
+  }
 
-    const deliveryCharge = 50;
-    const gstRate = 0.05;
+  const deliveryCharge = 50;
+  const gstRate = 0.05;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      renderCartItems();
-      recalculateTotals();
+  document.addEventListener("DOMContentLoaded", () => {
+    renderCartItems();
+    recalculateTotals();
 
-      const deliveryDateInput = document.getElementById("deliveryDate");
-      const date = new Date();
-      date.setDate(date.getDate() + 3);
-      deliveryDateInput.value = date.toISOString().split('T')[0];
+    const deliveryDateInput = document.getElementById("deliveryDate");
+    const date = new Date();
+    date.setDate(date.getDate() + 3);
+    deliveryDateInput.value = date.toISOString().split('T')[0];
+  });
+
+  function renderCartItems() {
+    const itemsContainer = document.getElementById('cartItems');
+    itemsContainer.innerHTML = '';
+
+    cartItems.forEach((item, index) => {
+      const div = document.createElement('div');
+      div.className = 'cart-item d-flex justify-content-between align-items-center mb-2';
+      div.innerHTML = `
+        <span>${item.name}</span>
+        <input type="number" min="1" class="quantity-input" data-index="${index}" value="${item.quantity}" style="width: 60px;">
+      `;
+      itemsContainer.appendChild(div);
     });
 
-    function renderCartItems() {
-      const itemsContainer = document.getElementById('cartItems');
-      itemsContainer.innerHTML = '';
+    attachQuantityListeners();
+  }
 
-      cartItems.forEach((item, index) => {
-        const div = document.createElement('div');
-        div.className = 'cart-item d-flex justify-content-between align-items-center mb-2';
-        div.innerHTML = `
-          <span>${item.name}</span>
-          <input type="number" min="1" class="quantity-input" data-index="${index}" value="${item.quantity}" style="width: 60px;">
-        `;
-        itemsContainer.appendChild(div);
+  function attachQuantityListeners() {
+    document.querySelectorAll('.quantity-input').forEach(input => {
+      input.addEventListener('change', (e) => {
+        const index = e.target.dataset.index;
+        let qty = parseInt(e.target.value);
+        if (qty < 1 || isNaN(qty)) {
+          qty = 1;
+          e.target.value = qty;
+        }
+        cartItems[index].quantity = qty;
+        recalculateTotals();
+        if (!singleItem) {
+          localStorage.setItem("cart", JSON.stringify(cartItems));
+        }
       });
+    });
+  }
 
-      attachQuantityListeners();
+  function recalculateTotals() {
+    const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const gst = +(subtotal * gstRate).toFixed(2);
+    const total = subtotal + gst + deliveryCharge;
+
+    document.getElementById("subtotal").textContent = subtotal;
+    document.getElementById("gst").textContent = gst;
+    document.getElementById("delivery").textContent = deliveryCharge;
+    document.getElementById("discount").textContent = 0;
+    document.getElementById("total").textContent = total;
+  }
+
+  async function fetchRazorpayKey() {
+    const res = await fetch("/api/razorpay-key");
+    const data = await res.json();
+    return data.key;
+  }
+
+  document.getElementById("placeOrderBtn").addEventListener("click", async () => {
+    const fullName = document.getElementById("fullName").value;
+    const phone = document.getElementById("phone").value;
+    const email = document.getElementById("email").value;
+    const address = document.getElementById("address").value;
+    const city = document.getElementById("city").value;
+    const state = document.getElementById("state").value;
+    const pincode = document.getElementById("pincode").value;
+    const expectedDeliveryDate = document.getElementById("deliveryDate").value;
+
+    if (!fullName || !phone || !email || !address || !city || !state || !pincode || !expectedDeliveryDate) {
+      alert("Please fill in all required fields.");
+      return;
     }
 
-    function attachQuantityListeners() {
-      document.querySelectorAll('.quantity-input').forEach(input => {
-        input.addEventListener('change', (e) => {
-          const index = e.target.dataset.index;
-          let qty = parseInt(e.target.value);
-          if (qty < 1 || isNaN(qty)) {
-            qty = 1;
-            e.target.value = qty;
-          }
-          cartItems[index].quantity = qty;
-          recalculateTotals();
-          if (!singleItem) {
-            localStorage.setItem("cart", JSON.stringify(cartItems));
-          }
-        });
+    const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const gst = +(subtotal * gstRate).toFixed(2);
+    const total = subtotal + gst + deliveryCharge;
+
+    try {
+      const key = await fetchRazorpayKey();
+
+      const res = await fetch("/api/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: total })
       });
-    }
+      const orderData = await res.json();
 
-    function recalculateTotals() {
-      const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-      const gst = +(subtotal * gstRate).toFixed(2);
-      const total = subtotal + gst + deliveryCharge;
-
-      document.getElementById("subtotal").textContent = subtotal;
-      document.getElementById("gst").textContent = gst;
-      document.getElementById("delivery").textContent = deliveryCharge;
-      document.getElementById("discount").textContent = 0;
-      document.getElementById("total").textContent = total;
-    }
-
-    document.getElementById("placeOrderBtn").addEventListener("click", async () => {
-      const fullName = document.getElementById("fullName").value;
-      const phone = document.getElementById("phone").value;
-      const email = document.getElementById("email").value;
-      const address = document.getElementById("address").value;
-      const city = document.getElementById("city").value;
-      const state = document.getElementById("state").value;
-      const pincode = document.getElementById("pincode").value;
-      const expectedDeliveryDate = document.getElementById("deliveryDate").value;
-
-      if (!fullName || !phone || !email || !address || !city || !state || !pincode || !expectedDeliveryDate) {
-        alert("Please fill in all required fields.");
+      if (!orderData.id) {
+        alert("Failed to create Razorpay order.");
         return;
       }
 
-      try {
-        const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-        const gst = +(subtotal * gstRate).toFixed(2);
-        const total = subtotal + gst + deliveryCharge;
+      const rzp = new Razorpay({
+        key,
+        amount: orderData.amount,
+        currency: "INR",
+        name: "AgroLink",
+        description: "Crop Purchase",
+        order_id: orderData.id,
+        handler: async function (response) {
+          const placeRes = await fetch("/api/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              customer: { fullName, phone, email, address, city, state, pincode },
+              items: cartItems,
+              totalAmount: total,
+              gst,
+              delivery: deliveryCharge,
+              expectedDeliveryDate
+            })
+          });
 
-        const res = await fetch("http://localhost:5000/api/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customer: { fullName, phone, email, address, city, state, pincode },
-            items: cartItems,
-            totalAmount: total,
-            gst,
-            delivery: deliveryCharge,
-            expectedDeliveryDate
-          })
-        });
+          const placeData = await placeRes.json();
+          if (placeData.success) {
+            if (!singleItem) localStorage.removeItem("cart");
+            localStorage.setItem("orderId", placeData.orderId);
+            window.location.href = "/order-confirmation.html";
+          } else {
+            alert("Payment succeeded but order failed.");
+          }
+        },
+        prefill: { email },
+        theme: { color: "#28a745" }
+      });
 
-        const data = await res.json();
-        if (data.success) {
-          if (!singleItem) localStorage.removeItem("cart");
-          localStorage.setItem("orderId", data.orderId);
-          window.location.href = "/order-confirmation.html";
-        } else {
-          alert("Error placing order. Please try again.");
-        }
-      } catch (error) {
-        alert("Something went wrong.");
-        console.error(error);
-      }
-    });
-  </script>
-  <!-- <script src="https://checkout.razorpay.com/v1/checkout.js"></script> -->
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<script>
-  async function startRazorpayPayment(totalAmount, buyerEmail) {
-    const res = await fetch("/api/create-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: totalAmount })
-    });
-
-    const order = await res.json();
-
-    const options = {
-      key: "RAZORPAY_KEY_ID_HERE", // From .env (visible part only)
-      amount: order.amount,
-      currency: "INR",
-      name: "AgroLink",
-      description: "Crop Purchase",
-      order_id: order.id,
-      handler: function (response) {
-        alert("Payment successful! ID: " + response.razorpay_payment_id);
-        // You can also redirect to a success page or save this to DB
-      },
-      prefill: {
-        email: buyerEmail,
-      },
-      theme: { color: "#28a745" }
-    };
-
-    const rzp = new Razorpay(options);
-    rzp.open();
-  }
+      rzp.open();
+    } catch (err) {
+      console.error("Payment error:", err);
+      alert("Something went wrong during payment.");
+    }
+  });
 </script>
+
 
 </body>
 </html>
