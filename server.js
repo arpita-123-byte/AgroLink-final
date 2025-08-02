@@ -32,26 +32,32 @@ const PORT = process.env.PORT || 5000;
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);  
 io.on('connection', (socket) => {
-  socket.on("joinRoom", ({ roomId }) => {
+  socket.on('joinRoom', ({ roomId }) => {
     socket.join(roomId);
-    socket.roomId = roomId; // ✅ Save it for later use
+    socket.roomId = roomId;
+    console.log(`User joined room: ${roomId}`);
   });
 
-  socket.on("chat message", async ({ sender, role, text }) => {
-    const msg = { sender, role, text, timestamp: new Date() };
-    
-    // ✅ Use roomId for scoped messaging
-    if (socket.roomId) {
-      io.to(socket.roomId).emit("chat message", msg);
-    }
+  socket.on('chatMessage', async ({ sender, role, text }) => {
+  const msg = {
+    sender,
+    role,
+    text,
+    roomId: socket.roomId || null,
+    timestamp: new Date()
+  };
 
-    // ✅ Save to MongoDB
-    try {
-      await Chat.create(msg);
-    } catch (err) {
-      console.error("Error saving chat:", err);
-    }
-  });
+  if (socket.roomId) {
+    io.to(socket.roomId).emit('chatMessage', msg);
+  }
+
+  try {
+    await Chat.create(msg);
+  } catch (err) {
+    console.error('Chat save error:', err);
+  }
+});
+
 });
 
 
@@ -592,14 +598,17 @@ app.get("/api/chat/:user1/:user2", async (req, res) => {
 
 
 app.get("/api/chat-history", async (req, res) => {
+  const { roomId } = req.query;
+
   try {
-    const chats = await Chat.find().sort({ timestamp: 1 });
+    const chats = await Chat.find({ roomId }).sort({ timestamp: 1 });
     res.json(chats);
   } catch (err) {
-    console.error("Chat fetch error:", err);
-    res.status(500).json({ error: "Failed to fetch chat history" });
+    console.error("Chat history fetch error:", err);
+    res.status(500).send("Failed to fetch chat history");
   }
 });
+
 
 
 

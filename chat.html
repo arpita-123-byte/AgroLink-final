@@ -16,28 +16,53 @@
 
   <script>
     const socket = io();
+const username = localStorage.getItem("userEmail") || "Guest";
+const role = localStorage.getItem("userRole") || "User";
 
-    const userEmail = localStorage.getItem("userEmail") || "Guest";
-const userRole = localStorage.getItem("userRole") || "User";
+const urlParams = new URLSearchParams(window.location.search);
+const targetEmail = urlParams.get("target");
 
+const roomId = [username, targetEmail].sort().join("-");
+const chatMessages = document.getElementById("messages");
+const messageInput = document.getElementById("messageInput");
 
-    const targetEmail = prompt("Enter the other person's email");
-    const roomId = [userEmail, targetEmail].sort().join("_"); // Shared room
+if (targetEmail) {
+  socket.emit("joinRoom", { roomId });
 
-    socket.emit("joinRoom", { roomId });
-
-    socket.on("message", (data) => {
-      const msgDiv = document.getElementById("messages");
-      msgDiv.innerHTML += `<div class='msg'><b>${data.sender}</b>: ${data.message}</div>`;
-      msgDiv.scrollTop = msgDiv.scrollHeight;
+  fetch(`/api/chat-history?roomId=${encodeURIComponent(roomId)}`)
+    .then(res => res.json())
+    .then(data => {
+      data.forEach(msg => {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = msg.sender === username ? "text-end text-success" : "text-start text-primary";
+        msgDiv.textContent = `${msg.role}: ${msg.text}`;
+        chatMessages.appendChild(msgDiv);
+      });
+      chatMessages.scrollTop = chatMessages.scrollHeight;
     });
+}
 
-    function sendMessage() {
-      const message = document.getElementById("messageInput").value;
-      if (!message) return;
-      socket.emit("chatMessage", { roomId, sender: userEmail, message });
-      document.getElementById("messageInput").value = "";
-    }
+function sendMessage() {
+  const text = messageInput.value.trim();
+  if (!text) return;
+
+  socket.emit("chatMessage", {
+    sender: username,
+    role,
+    text
+  });
+
+  messageInput.value = "";
+}
+
+socket.on("chatMessage", (msg) => {
+  const msgDiv = document.createElement("div");
+  msgDiv.className = msg.sender === username ? "text-end text-success" : "text-start text-primary";
+  msgDiv.textContent = `${msg.role}: ${msg.text}`;
+  chatMessages.appendChild(msgDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
   </script>
 </body>
 </html>
