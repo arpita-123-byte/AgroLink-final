@@ -20,6 +20,8 @@ const User = require("./models/User");
 const Subscription = require("./models/Subscription");
 const Order = require("./models/order");
 const Contact= require("./models/Contact");
+const Chat = require("./models/Chat");
+
 
 const app = express();
 // app.use(express.static(__dirname));
@@ -28,7 +30,30 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http);  
+io.on('connection', (socket) => {
+  socket.on("joinRoom", ({ roomId }) => {
+    socket.join(roomId);
+    socket.roomId = roomId; // ✅ Save it for later use
+  });
+
+  socket.on("chat message", async ({ sender, role, text }) => {
+    const msg = { sender, role, text, timestamp: new Date() };
+    
+    // ✅ Use roomId for scoped messaging
+    if (socket.roomId) {
+      io.to(socket.roomId).emit("chat message", msg);
+    }
+
+    // ✅ Save to MongoDB
+    try {
+      await Chat.create(msg);
+    } catch (err) {
+      console.error("Error saving chat:", err);
+    }
+  });
+});
+
 
 
 // Middleware
@@ -59,7 +84,7 @@ app.use("/assets", express.static(path.join(__dirname, "assets")));
 // HTML Routes
     const pages = [
       "login", "signup", "index", "sell", "crops", "crop-detail",
-      "register", "cart", "checkout", "order-confirmation", "update-status", "order-status", "contact", "choose-role"
+      "register", "cart", "checkout", "order-confirmation", "update-status", "order-status", "contact", "choose-role", "chat"
     ];
     pages.forEach((page) => {
       app.get(`/${page}.html`, (req, res) => res.sendFile(path.join(__dirname, `${page}.html`)));
@@ -547,6 +572,36 @@ app.post("/set-role", async (req, res) => {
 });
 
 
+app.get("/api/chat/:user1/:user2", async (req, res) => {
+  const { user1, user2 } = req.params;
+
+  try {
+    const chats = await Chat.find({
+      $or: [
+        { sender: user1, receiver: user2 },
+        { sender: user2, receiver: user1 }
+      ]
+    }).sort({ timestamp: 1 });
+
+    res.json(chats);
+  } catch (err) {
+    console.error("Chat fetch error:", err);
+    res.status(500).json({ error: "Failed to load chat history" });
+  }
+});
+
+
+app.get("/api/chat-history", async (req, res) => {
+  try {
+    const chats = await Chat.find().sort({ timestamp: 1 });
+    res.json(chats);
+  } catch (err) {
+    console.error("Chat fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch chat history" });
+  }
+});
+
+
 
 
   })
@@ -577,7 +632,7 @@ app.get("/api/crops/search", async (req, res) => {
 
 
 
-//  Checkout Route
+// Checkout Route
 app.post("/api/checkout", async (req, res) => {
   try {
     let {
@@ -587,21 +642,24 @@ app.post("/api/checkout", async (req, res) => {
       gst,
       delivery,
       expectedDeliveryDate,
+      paymentMethod,
+      paymentId,
+      razorpayOrderId,
     } = req.body;
 
-    //  Validate customer info and items
-    if (!customer || !items || items.length === 0) {
+    // Validate customer info and items
+    if (!customer || !items || items.length === 0 || !paymentMethod) {
       return res
         .status(400)
         .json({ success: false, message: "Missing order data" });
     }
 
-    //  Normalize email
+    // Normalize email
     if (customer.email) {
       customer.email = customer.email.trim().toLowerCase();
     }
 
-    //  Parse delivery date safely
+    // Parse delivery date safely
     const parsedDate = new Date(expectedDeliveryDate);
     if (isNaN(parsedDate.getTime())) {
       return res
@@ -609,7 +667,10 @@ app.post("/api/checkout", async (req, res) => {
         .json({ success: false, message: "Invalid delivery date" });
     }
 
-    //  Save Order
+    // Set order status
+    let orderStatus = paymentMethod === "razorpay" ? "Paid" : "Confirmed";
+
+    // Save Order
     const newOrder = new Order({
       customer,
       items,
@@ -617,49 +678,51 @@ app.post("/api/checkout", async (req, res) => {
       gst,
       delivery,
       expectedDeliveryDate: parsedDate,
+      paymentMethod,
+      paymentId,
+      razorpayOrderId,
+      status: orderStatus,
       placedAt: new Date(),
     });
 
     const savedOrder = await newOrder.save();
- for (const item of items) {
-  const crop = await Crop.findById(item.id);
-  if (crop) {
-    const quantityParts = crop.quantity.split(" ");
-    let cropQty = parseInt(quantityParts[0]);
-    const unit = quantityParts.slice(1).join(" ");
 
-    const itemQty = parseInt(item.quantity);
+    // Update crop stock
+    for (const item of items) {
+      const crop = await Crop.findById(item.id);
+      if (crop) {
+        const quantityParts = crop.quantity.split(" ");
+        let cropQty = parseInt(quantityParts[0]);
+        const unit = quantityParts.slice(1).join(" ");
+        const itemQty = parseInt(item.quantity);
 
-    if (cropQty <= 0 || crop.status === 'Out of Stock') {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Sorry, ${crop.name} is Out of Stock` 
-      });
+        if (cropQty <= 0 || crop.status === "Out of Stock") {
+          return res.status(400).json({
+            success: false,
+            message: `Sorry, ${crop.name} is Out of Stock`,
+          });
+        }
+
+        if (itemQty > cropQty) {
+          return res.status(400).json({
+            success: false,
+            message: `Only ${cropQty} ${unit} of ${crop.name} is available`,
+          });
+        }
+
+        let newQty = cropQty - itemQty;
+        if (newQty <= 0) {
+          crop.quantity = `0 ${unit}`;
+          crop.status = "Out of Stock";
+        } else {
+          crop.quantity = `${newQty} ${unit}`;
+        }
+
+        await crop.save();
+      }
     }
 
-    if (itemQty > cropQty) {
-      return res.status(400).json({
-        success: false,
-        message: `Only ${cropQty} ${unit} of ${crop.name} is available`
-      });
-    }
-
-    // Proceed to reduce stock
-    let newQty = cropQty - itemQty;
-    if (newQty <= 0) {
-      crop.quantity = `0 ${unit}`;
-      crop.status = "Out of Stock";
-    } else {
-      crop.quantity = `${newQty} ${unit}`;
-    }
-
-    await crop.save();
-  }
-}
-
-
-
-    //  Email setup
+    // Email setup
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -672,15 +735,15 @@ app.post("/api/checkout", async (req, res) => {
       .map((item) => `- ${item.name} x${item.quantity}`)
       .join("\n");
 
-    //  Email to Buyer
+    // Email to Buyer
     await transporter.sendMail({
       from: '"AgroLink" <your@email>',
       to: customer.email,
       subject: "Your AgroLink Order is Confirmed!",
-      text: `Hi ${customer.fullName},\n\nYour order has been confirmed and will be delivered by ${parsedDate.toDateString()}.\n\nOrder Details:\n${cropList}\n\nThank you for using AgroLink! 🌾`
+      text: `Hi ${customer.fullName},\n\nYour order has been confirmed and will be delivered by ${parsedDate.toDateString()}.\n\nOrder Details:\n${cropList}\n\nThank you for using AgroLink! 🌾`,
     });
 
-    //  Email to Sellers (based on crop info)
+    // Email to Sellers
     for (const item of items) {
       const crop = await Crop.findById(item.id);
       if (!crop || !crop.sellerEmail) continue;
@@ -689,17 +752,18 @@ app.post("/api/checkout", async (req, res) => {
         from: '"AgroLink" <your@email>',
         to: crop.sellerEmail,
         subject: "You have a new order on AgroLink!",
-        text: `Dear Seller,\n\nYour crop "${crop.name}" has been ordered.\n\nOrder Details:\n- Quantity: ${item.quantity}\n\nDeliver to:\n${customer.fullName}\n${customer.address}, ${customer.city}, ${customer.state} - ${customer.pincode}\nPhone: ${customer.phone}\nExpected Delivery: ${parsedDate.toDateString()}`
+        text: `Dear Seller,\n\nYour crop "${crop.name}" has been ordered.\n\nOrder Details:\n- Quantity: ${item.quantity}\n\nDeliver to:\n${customer.fullName}\n${customer.address}, ${customer.city}, ${customer.state} - ${customer.pincode}\nPhone: ${customer.phone}\nExpected Delivery: ${parsedDate.toDateString()}`,
       });
     }
 
     res.json({ success: true, orderId: savedOrder._id });
 
   } catch (err) {
-    console.error(err);
+    console.error("Checkout Error:", err);
     res.status(500).json({ success: false, message: "Something went wrong." });
   }
 });
+
 
    app.get("/api/razorpay-key", (req, res) => {
   res.json({ key: process.env.RAZORPAY_KEY_ID });

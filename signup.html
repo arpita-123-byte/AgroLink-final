@@ -61,6 +61,7 @@
      if (response.ok) {
   const result = await response.json();
   localStorage.setItem("userEmail", email); // ✅ Store email for orders
+    localStorage.setItem("userRole", data.role);
 
   // ✅ Redirect based on role
   if (result.role === "farmer") {

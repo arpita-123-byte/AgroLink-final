@@ -93,6 +93,21 @@
             <strong>Total Amount</strong>
             <strong>₹<span id="total">0</span></strong>
           </div>
+          <h3>Select Payment Method:</h3>
+<h5 class="mt-4">Select Payment Method:</h5>
+<div class="payment-methods">
+  <label class="payment-option" id="razorpayOption">
+    <input type="radio" name="paymentMethod" value="razorpay" checked>
+    Pay Online (Razorpay)
+  </label>
+  <label class="payment-option" id="codOption">
+    <input type="radio" name="paymentMethod" value="cod">
+    Cash on Delivery (COD)
+  </label>
+</div>
+
+
+
           <button class="btn btn-danger mt-4 w-100 fw-bold" id="placeOrderBtn">PLACE ORDER</button>
           <div id="confirmationMsg" class="mt-4 text-success fw-bold text-center"></div>
         </div>
@@ -101,7 +116,8 @@
   </div>
 
   <!-- Checkout Script -->
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <!-- Checkout Script -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
   let cartItems = [];
   const singleItem = localStorage.getItem("checkoutItem");
@@ -189,6 +205,7 @@
     const state = document.getElementById("state").value;
     const pincode = document.getElementById("pincode").value;
     const expectedDeliveryDate = document.getElementById("deliveryDate").value;
+    const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
 
     if (!fullName || !phone || !email || !address || !city || !state || !pincode || !expectedDeliveryDate) {
       alert("Please fill in all required fields.");
@@ -199,62 +216,92 @@
     const gst = +(subtotal * gstRate).toFixed(2);
     const total = subtotal + gst + deliveryCharge;
 
-    try {
-      const key = await fetchRazorpayKey();
+    const orderPayload = {
+      customer: { fullName, phone, email, address, city, state, pincode },
+      items: cartItems,
+      totalAmount: total,
+      gst,
+      delivery: deliveryCharge,
+      expectedDeliveryDate,
+      paymentMethod
+    };
 
-      const res = await fetch("/api/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: total })
-      });
-      const orderData = await res.json();
+    if (paymentMethod === "razorpay") {
+      try {
+        const key = await fetchRazorpayKey();
+        const res = await fetch("/api/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: total })
+        });
 
-      if (!orderData.id) {
-        alert("Failed to create Razorpay order.");
-        return;
+        const orderData = await res.json();
+
+        if (!orderData.id) {
+          alert("Failed to create Razorpay order.");
+          return;
+        }
+
+        const rzp = new Razorpay({
+          key,
+          amount: orderData.amount,
+          currency: "INR",
+          name: "AgroLink",
+          description: "Crop Purchase",
+          order_id: orderData.id,
+          handler: async function (response) {
+            orderPayload.paymentId = response.razorpay_payment_id;
+            orderPayload.razorpayOrderId = orderData.id;
+
+            const placeRes = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(orderPayload)
+            });
+
+            const placeData = await placeRes.json();
+            if (placeData.success) {
+              if (!singleItem) localStorage.removeItem("cart");
+              localStorage.setItem("orderId", placeData.orderId);
+              window.location.href = "/order-confirmation.html";
+            } else {
+              alert("Payment succeeded but order failed.");
+            }
+          },
+          prefill: { email },
+          theme: { color: "#28a745" }
+        });
+
+        rzp.open();
+      } catch (err) {
+        console.error("Payment error:", err);
+        alert("Something went wrong during payment.");
       }
 
-      const rzp = new Razorpay({
-        key,
-        amount: orderData.amount,
-        currency: "INR",
-        name: "AgroLink",
-        description: "Crop Purchase",
-        order_id: orderData.id,
-        handler: async function (response) {
-          const placeRes = await fetch("/api/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              customer: { fullName, phone, email, address, city, state, pincode },
-              items: cartItems,
-              totalAmount: total,
-              gst,
-              delivery: deliveryCharge,
-              expectedDeliveryDate
-            })
-          });
+    } else if (paymentMethod === "cod") {
+      try {
+        const placeRes = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(orderPayload)
+        });
 
-          const placeData = await placeRes.json();
-          if (placeData.success) {
-            if (!singleItem) localStorage.removeItem("cart");
-            localStorage.setItem("orderId", placeData.orderId);
-            window.location.href = "/order-confirmation.html";
-          } else {
-            alert("Payment succeeded but order failed.");
-          }
-        },
-        prefill: { email },
-        theme: { color: "#28a745" }
-      });
-
-      rzp.open();
-    } catch (err) {
-      console.error("Payment error:", err);
-      alert("Something went wrong during payment.");
+        const placeData = await placeRes.json();
+        if (placeData.success) {
+          if (!singleItem) localStorage.removeItem("cart");
+          localStorage.setItem("orderId", placeData.orderId);
+          window.location.href = "/order-confirmation.html";
+        } else {
+          alert("Order failed.");
+        }
+      } catch (err) {
+        console.error("COD order error:", err);
+        alert("Something went wrong while placing COD order.");
+      }
     }
   });
 </script>
+
 
 
 </body>

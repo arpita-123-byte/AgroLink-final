@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Chat - AgroLink</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    #messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    .msg { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Live Chat</h2>
+  <div id="messages"></div>
+  <input type="text" id="messageInput" placeholder="Type a message" />
+  <button onclick="sendMessage()">Send</button>
+
+  <script>
+    const socket = io();
+
+    const userEmail = localStorage.getItem("userEmail") || "Guest";
+const userRole = localStorage.getItem("userRole") || "User";
+
+
+    const targetEmail = prompt("Enter the other person's email");
+    const roomId = [userEmail, targetEmail].sort().join("_"); // Shared room
+
+    socket.emit("joinRoom", { roomId });
+
+    socket.on("message", (data) => {
+      const msgDiv = document.getElementById("messages");
+      msgDiv.innerHTML += `<div class='msg'><b>${data.sender}</b>: ${data.message}</div>`;
+      msgDiv.scrollTop = msgDiv.scrollHeight;
+    });
+
+    function sendMessage() {
+      const message = document.getElementById("messageInput").value;
+      if (!message) return;
+      socket.emit("chatMessage", { roomId, sender: userEmail, message });
+      document.getElementById("messageInput").value = "";
+    }
+  </script>
+</body>
+</html>

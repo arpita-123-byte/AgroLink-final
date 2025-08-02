@@ -27,19 +27,41 @@ const orderSchema = new mongoose.Schema({
     default: Date.now
   },
 
-  // ✅ NEW FIELD: Order progress status
   status: {
     type: String,
-    enum: ["Confirmed", "Packed", "Shipped", "Out for Delivery", "Delivered"],
+    enum: [
+      "Confirmed",
+      "Packed",
+      "Shipped",
+      "Out for Delivery",
+      "Delivered",
+      "Cancelled",
+      "Returned",
+      "Paid"
+    ],
     default: "Confirmed"
   },
 
-  // ✅ NEW FIELD: Expected delivery date
   expectedDeliveryDate: {
     type: Date,
-    required: false // optional, but useful for email notifications
+    required: false
+  },
+
+  paymentMethod: {
+    type: String,
+    enum: ["razorpay", "cod"],
+    required: true
+  },
+
+  paymentId: {
+    type: String
+  },
+
+  razorpayOrderId: {
+    type: String
   }
 });
 
 module.exports = mongoose.model("Order", orderSchema);
+
 
