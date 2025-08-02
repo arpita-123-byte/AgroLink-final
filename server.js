@@ -706,6 +706,9 @@ app.post("/api/checkout", async (req, res) => {
 });
 
 const Razorpay = require("razorpay");
+console.log("🔑 Razorpay Key ID:", process.env.RAZORPAY_KEY_ID);
+console.log("🔐 Razorpay Key Secret:", process.env.RAZORPAY_KEY_SECRET ? "Loaded" : "Not Loaded");
+
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
