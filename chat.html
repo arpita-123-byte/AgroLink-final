@@ -1,68 +1,83 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Live Chat - AgroLink</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <title>Chat</title>
   <style>
-    #messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
-    .msg { margin-bottom: 10px; }
+    #chat-box { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    #chat-input { width: 80%; }
+    #send-btn { width: 18%; }
+    .message { margin: 5px 0; }
+    .you { color: green; }
+    .them { color: blue; }
   </style>
 </head>
 <body>
   <h2>Live Chat</h2>
-  <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type a message" />
-  <button onclick="sendMessage()">Send</button>
+  <div id="chat-box"></div>
+  <input id="chat-input" placeholder="Type a message..." />
+  <button id="send-btn">Send</button>
 
-  <script>
-    const socket = io();
-const username = localStorage.getItem("userEmail") || "Guest";
-const role = localStorage.getItem("userRole") || "User";
+  <script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
 
-const urlParams = new URLSearchParams(window.location.search);
-const targetEmail = urlParams.get("target");
+  const urlParams = new URLSearchParams(window.location.search);
+  const user1 = urlParams.get("user1"); // current user
+  const user2 = urlParams.get("user2"); // chatting with
 
-const roomId = [username, targetEmail].sort().join("-");
-const chatMessages = document.getElementById("messages");
-const messageInput = document.getElementById("messageInput");
+  const chatBox = document.getElementById("chat-box");
 
-if (targetEmail) {
-  socket.emit("joinRoom", { roomId });
-
-  fetch(`/api/chat-history?roomId=${encodeURIComponent(roomId)}`)
+  // Fetch past chat
+  fetch(`/api/chat/${user1}/${user2}`)
     .then(res => res.json())
-    .then(data => {
-      data.forEach(msg => {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = msg.sender === username ? "text-end text-success" : "text-start text-primary";
-        msgDiv.textContent = `${msg.role}: ${msg.text}`;
-        chatMessages.appendChild(msgDiv);
+    .then(messages => {
+      messages.forEach(msg => {
+        const div = document.createElement("div");
+        div.classList.add("message");
+        div.classList.add(msg.sender === user1 ? "you" : "them");
+        div.textContent = `${msg.role || 'user'} (${msg.sender}): ${msg.text || msg.message}`;
+        chatBox.appendChild(div);
       });
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      chatBox.scrollTop = chatBox.scrollHeight;
     });
-}
 
-function sendMessage() {
-  const text = messageInput.value.trim();
-  if (!text) return;
+  // Send message
+  document.getElementById("send-btn").addEventListener("click", () => {
+    const input = document.getElementById("chat-input");
+    const message = input.value.trim();
+    if (!message) return;
 
-  socket.emit("chatMessage", {
-    sender: username,
-    role,
-    text
+    const roomId = [user1, user2].sort().join("_");
+
+    socket.emit("chat message", {
+      sender: user1,
+      text: message,
+      roomId
+    });
+
+    const div = document.createElement("div");
+    div.classList.add("message", "you");
+    div.textContent = `You (${user1}): ${message}`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    input.value = "";
   });
 
-  messageInput.value = "";
-}
+  // Join room
+  const roomId = [user1, user2].sort().join("_");
+  socket.emit("join room", roomId);
 
-socket.on("chatMessage", (msg) => {
-  const msgDiv = document.createElement("div");
-  msgDiv.className = msg.sender === username ? "text-end text-success" : "text-start text-primary";
-  msgDiv.textContent = `${msg.role}: ${msg.text}`;
-  chatMessages.appendChild(msgDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-});
+  // Receive message
+  socket.on("chat message", (msg) => {
+    if (msg.sender !== user1) {
+      const div = document.createElement("div");
+      div.classList.add("message", "them");
+      div.textContent = `${msg.role || 'user'} (${msg.sender}): ${msg.text || msg.message}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  });
+</script>
 
-  </script>
 </body>
 </html>

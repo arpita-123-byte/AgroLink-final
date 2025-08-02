@@ -32,33 +32,48 @@ const PORT = process.env.PORT || 5000;
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);  
 io.on('connection', (socket) => {
-  socket.on('joinRoom', ({ roomId }) => {
-    socket.join(roomId);
-    socket.roomId = roomId;
-    console.log(`User joined room: ${roomId}`);
+  console.log('A user connected:', socket.id);
+
+  socket.on("chat message", async ({ sender, text, roomId }) => {
+    try {
+      // Fetch role from MongoDB
+      const user = await User.findOne({ email: sender });
+      const role = user?.role || "user"; // fallback in case user not found
+
+      const msg = {
+        sender,
+        role,
+        text,
+        roomId,
+        timestamp: new Date()
+      };
+
+      // Emit to specific room or all
+      if (roomId) {
+        io.to(roomId).emit("chat message", msg);
+      } else {
+        io.emit("chat message", msg);
+      }
+
+      await Chat.create(msg);
+    } catch (err) {
+      console.error("Error handling chat message:", err);
+    }
   });
 
-  socket.on('chatMessage', async ({ sender, role, text }) => {
-  const msg = {
-    sender,
-    role,
-    text,
-    roomId: socket.roomId || null,
-    timestamp: new Date()
-  };
+  socket.on("join room", (roomId) => {
+    socket.join(roomId);
+    console.log(`User ${socket.id} joined room: ${roomId}`);
+  });
 
-  if (socket.roomId) {
-    io.to(socket.roomId).emit('chatMessage', msg);
-  }
-
-  try {
-    await Chat.create(msg);
-  } catch (err) {
-    console.error('Chat save error:', err);
-  }
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
 });
 
-});
+
+
+
 
 
 
@@ -595,6 +610,7 @@ app.get("/api/chat/:user1/:user2", async (req, res) => {
     res.status(500).json({ error: "Failed to load chat history" });
   }
 });
+
 
 
 app.get("/api/chat-history", async (req, res) => {
