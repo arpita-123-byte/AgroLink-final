@@ -128,8 +128,20 @@
 
         <!-- End Profile Dropdown -->
       </ul>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+
+<script>
+  function logout() {
+    fetch('/logout')
+      .then(() => window.location.href = '/login.html')
+      .catch(err => alert("Logout failed"));
+  }
+</script>
+      
     </div>
   </div>
+  
+  
 </nav>
 
 
@@ -251,12 +263,29 @@ function sendMessage() {
   messageInput.value = "";
 }
 
+ //  Login/Logout Handling
+    const loginLink = document.getElementById("loginLink");
+    const joinBtn = document.getElementById("joinBtn");
+    const isLoggedIn = sessionStorage.getItem("isLoggedIn");
+
+    if (isLoggedIn === "true") {
+      loginLink.textContent = "Logout";
+      loginLink.href = "#";
+      loginLink.addEventListener("click", () => {
+        sessionStorage.clear();
+        location.reload();
+      });
+      if (joinBtn) joinBtn.style.display = "none";
+    }
+
 socket.on("chat message", (msg) => {
   const msgDiv = document.createElement("div");
   msgDiv.className = msg.sender === username ? "text-end text-success" : "text-start text-primary";
   msgDiv.textContent = `${msg.role || "User"}: ${msg.text}`;
   chatMessages.appendChild(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+
+
 });
 
 </script>

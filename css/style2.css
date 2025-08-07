@@ -271,3 +271,14 @@ footer {
   font-weight: 500;
 }
 
+.logout-btn {
+  background-color: #28a745; /* Agro green */
+  color: white;
+  padding: 10px 20px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin: 10px;
+}
